@@ -484,10 +484,19 @@ fn build_v8(is_asan: bool) {
     ));
     gn_args.push(r#"ios_deployment_target="14.0""#.to_string());
     gn_args.push("ios_enable_code_signing=false".to_string());
-    gn_args.push("treat_warnings_as_errors=false".to_string());
-    gn_args.push("v8_enable_webassembly=false".to_string());
-    if !is_sim {
-      // Device: no JIT permitted -> jitless build, all tiers off.
+    if !gn_args_env.contains("treat_warnings_as_errors") {
+      gn_args.push("treat_warnings_as_errors=false".to_string());
+    }
+    // Guard against a duplicate assignment: a host snapshot-generator build
+    // that must match this config passes `v8_enable_webassembly=false` via
+    // GN_ARGS, and gn rejects the same variable being set twice.
+    if !gn_args_env.contains("v8_enable_webassembly") {
+      gn_args.push("v8_enable_webassembly=false".to_string());
+    }
+    if !is_sim && !gn_args_env.contains("v8_jitless") {
+      // Device: no JIT permitted -> jitless build, all tiers off. Guarded so a
+      // host snapshot-generator build can match this config via GN_ARGS without
+      // a duplicate gn assignment.
       gn_args.push("v8_jitless=true".to_string());
       gn_args.push("v8_enable_sparkplug=false".to_string());
       gn_args.push("v8_enable_maglev=false".to_string());
