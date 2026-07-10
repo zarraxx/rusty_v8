@@ -22,6 +22,7 @@ grep -F "clang_release_version=$clang_release_version" <<<"$output" >/dev/null |
 grep -F "clang_resource_include=$repo_root/.fork_build/cargo-target/riscv64gc-unknown-linux-gnu/debug/clang/lib/clang/$clang_release_version/include" <<<"$output" >/dev/null || fail "missing riscv64 clang resource include"
 grep -F "sysroot=$repo_root/.fork_build/sysroots/debian_trixie_riscv64-sysroot" <<<"$output" >/dev/null || fail "missing riscv64 sysroot"
 grep -F "gn_target_sysroot=//.fork_build/sysroots/debian_trixie_riscv64-sysroot" <<<"$output" >/dev/null || fail "missing riscv64 GN target sysroot"
+grep -F "bindgen_target_env=BINDGEN_EXTRA_CLANG_ARGS_riscv64gc_unknown_linux_gnu" <<<"$output" >/dev/null || fail "missing riscv64 bindgen target env"
 grep -F "bindgen_extra_clang_args=--target=riscv64-unknown-linux-gnu --sysroot=$repo_root/.fork_build/sysroots/debian_trixie_riscv64-sysroot -isystem$repo_root/.fork_build/cargo-target/riscv64gc-unknown-linux-gnu/debug/clang/lib/clang/$clang_release_version/include -isystem$repo_root/.fork_build/sysroots/debian_trixie_riscv64-sysroot/usr/include -isystem$repo_root/.fork_build/sysroots/debian_trixie_riscv64-sysroot/usr/include/riscv64-linux-gnu" <<<"$output" >/dev/null || fail "missing riscv64 bindgen args"
 
 output="$("$script" --dry-run loongarch64)"
@@ -34,6 +35,7 @@ grep -F "clang_release_version=$clang_release_version" <<<"$output" >/dev/null |
 grep -F "clang_resource_include=$repo_root/.fork_build/cargo-target/loongarch64-unknown-linux-gnu/debug/clang/lib/clang/$clang_release_version/include" <<<"$output" >/dev/null || fail "missing loong64 clang resource include"
 grep -F "sysroot=$repo_root/.fork_build/sysroots/debian_trixie_loong64-sysroot" <<<"$output" >/dev/null || fail "missing loong64 sysroot"
 grep -F "gn_target_sysroot=//.fork_build/sysroots/debian_trixie_loong64-sysroot" <<<"$output" >/dev/null || fail "missing loong64 GN target sysroot"
+grep -F "bindgen_target_env=BINDGEN_EXTRA_CLANG_ARGS_loongarch64_unknown_linux_gnu" <<<"$output" >/dev/null || fail "missing loong64 bindgen target env"
 grep -F "bindgen_extra_clang_args=--target=loongarch64-unknown-linux-gnu --sysroot=$repo_root/.fork_build/sysroots/debian_trixie_loong64-sysroot -isystem$repo_root/.fork_build/cargo-target/loongarch64-unknown-linux-gnu/debug/clang/lib/clang/$clang_release_version/include -isystem$repo_root/.fork_build/sysroots/debian_trixie_loong64-sysroot/usr/include -isystem$repo_root/.fork_build/sysroots/debian_trixie_loong64-sysroot/usr/include/loongarch64-linux-gnu" <<<"$output" >/dev/null || fail "missing loong64 bindgen args"
 
 output="$("$script" --build --release --dry-run loongarch64)"
@@ -113,6 +115,10 @@ grep -F "for header_dir in bits gnu sys asm" "$script" >/dev/null || fail "scrip
 grep -F "sys/cdefs.h" "$script" >/dev/null || fail "script should verify sys/cdefs.h"
 grep -F ".git/info/exclude" "$script" >/dev/null || fail "script should update local git exclude"
 grep -F ".fork_build/" "$script" >/dev/null || fail "script should ignore fork build directory"
+grep -F "unset BINDGEN_EXTRA_CLANG_ARGS" "$script" >/dev/null || fail "script should avoid global bindgen args for host bindgen"
+if grep -F "export BINDGEN_EXTRA_CLANG_ARGS=" "$script" >/dev/null; then
+  fail "script should not append target clang args to global bindgen args"
+fi
 
 [[ -f "$workflow" ]] || fail "missing fork cross release workflow"
 grep -F "name: fork-cross-release" "$workflow" >/dev/null || fail "missing workflow name"

@@ -86,6 +86,7 @@ if [[ -z "$clang_release_version" ]]; then
 fi
 clang_resource_include="$cargo_target_dir/$rust_target/$profile/clang/lib/clang/$clang_release_version/include"
 bindgen_extra_clang_args="--target=$clang_target --sysroot=$sysroot -isystem$clang_resource_include -isystem$sysroot/usr/include -isystem$sysroot/usr/include/$multiarch_include"
+bindgen_target_env="BINDGEN_EXTRA_CLANG_ARGS_${rust_target//-/_}"
 fork_patches=(
   "$repo_root/fork_patches/patches/0001-build-config-add-loong64-sysroot.patch"
   "$repo_root/fork_patches/patches/0002-build-config-skip-loong64-clang-builtins.patch"
@@ -279,6 +280,7 @@ if [[ "$dry_run" == 1 ]]; then
   printf 'stamp=%s\n' "$stamp"
   printf 'packages=%s\n' "${packages[*]}"
   printf 'cargo_target_dir=%s\n' "$cargo_target_dir"
+  printf 'bindgen_target_env=%s\n' "$bindgen_target_env"
   printf 'bindgen_extra_clang_args=%s\n' "$bindgen_extra_clang_args"
   printf 'fork_patches=%s\n' "${fork_patches[*]}"
   printf 'extra_gn_args=%s\n' "$fork_gn_args"
@@ -351,9 +353,10 @@ mkdir -p "$cargo_target_dir"
   export V8_FROM_SOURCE=1
   export CARGO_TARGET_DIR="$cargo_target_dir"
   export EXTRA_GN_ARGS="${EXTRA_GN_ARGS:-} ${fork_gn_args}"
-  export BINDGEN_EXTRA_CLANG_ARGS="${BINDGEN_EXTRA_CLANG_ARGS:-} ${bindgen_extra_clang_args}"
-  bindgen_target_env="BINDGEN_EXTRA_CLANG_ARGS_${rust_target//-/_}"
-  export "$bindgen_target_env=${!bindgen_target_env:-} ${bindgen_extra_clang_args}"
+  bindgen_existing_args="$(printenv "$bindgen_target_env" || true)"
+  bindgen_global_args="${BINDGEN_EXTRA_CLANG_ARGS:-}"
+  unset BINDGEN_EXTRA_CLANG_ARGS
+  export "$bindgen_target_env=${bindgen_existing_args:+$bindgen_existing_args }${bindgen_global_args:+$bindgen_global_args }$bindgen_extra_clang_args"
   export PATH="$host_tools_dir:$PATH"
   cargo build -vv "${cargo_profile_args[@]}" --target "$rust_target"
 )
