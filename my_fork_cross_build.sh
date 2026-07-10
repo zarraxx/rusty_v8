@@ -174,7 +174,7 @@ prepare_sysroot() {
   echo "created sysroot: $sysroot_path"
 }
 
-link_sysroot_multiarch_headers() {
+install_sysroot_multiarch_headers() {
   local sysroot_path="$1"
   local multiarch="$2"
   local include_dir="$sysroot_path/usr/include"
@@ -184,10 +184,20 @@ link_sysroot_multiarch_headers() {
   [[ -d "$multiarch_dir" ]] || return
 
   for header_dir in bits gnu sys asm; do
+    if [[ -L "$include_dir/$header_dir" ]]; then
+      rm "$include_dir/$header_dir"
+    fi
     if [[ -e "$multiarch_dir/$header_dir" && ! -e "$include_dir/$header_dir" ]]; then
-      ln -s "$multiarch/$header_dir" "$include_dir/$header_dir"
+      cp -a "$multiarch_dir/$header_dir" "$include_dir/$header_dir"
+      echo "installed sysroot multiarch headers: $include_dir/$header_dir"
     fi
   done
+
+  if [[ -e "$multiarch_dir/sys/cdefs.h" && ! -e "$include_dir/sys/cdefs.h" ]]; then
+    echo "failed to install sysroot multiarch header: $include_dir/sys/cdefs.h" >&2
+    find "$include_dir" -maxdepth 3 \( -path "*/sys/cdefs.h" -o -path "*/features.h" \) -print >&2
+    exit 1
+  fi
 }
 
 write_host_tools() {
@@ -260,7 +270,7 @@ prepare_sysroot \
   "$debian_arch" \
   "$rust_target" \
   ".debian_trixie_${sysroot_suffix}-sysroot.tmp"
-link_sysroot_multiarch_headers "$sysroot" "$multiarch_include"
+install_sysroot_multiarch_headers "$sysroot" "$multiarch_include"
 
 if [[ "$build" == 0 ]]; then
   exit 0
@@ -274,7 +284,7 @@ prepare_sysroot \
   "amd64" \
   "x86_64-unknown-linux-gnu" \
   ".debian_bullseye_amd64-sysroot.tmp"
-link_sysroot_multiarch_headers "$host_sysroot" "$host_multiarch_include"
+install_sysroot_multiarch_headers "$host_sysroot" "$host_multiarch_include"
 
 write_host_tools
 
