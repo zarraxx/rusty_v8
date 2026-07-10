@@ -101,10 +101,10 @@ grep -F "pkg_config=\"$repo_root/.fork_build/bin/pkg-config\"" <<<"$output" >/de
 grep -F "host_pkg_config=\"$repo_root/.fork_build/bin/pkg-config\"" <<<"$output" >/dev/null || fail "missing host_pkg_config GN arg"
 
 grep -F -- "--exclude=./dev/*" "$script" >/dev/null || fail "sysroot export should skip root device nodes"
+grep -F -- "--exclude=dev/*" "$script" >/dev/null || fail "sysroot export should skip root device nodes from docker export"
+grep -F -- "--anchored" "$script" >/dev/null || fail "sysroot export excludes should be anchored"
 grep -F -- "--exclude=./sys/*" "$script" >/dev/null || fail "sysroot export should skip root sysfs"
-if grep -F -- "--exclude=sys/*" "$script" >/dev/null; then
-  fail "sysroot export should not skip libc sys headers"
-fi
+grep -F -- "--exclude=sys/*" "$script" >/dev/null || fail "sysroot export should skip root sysfs from docker export"
 grep -F "install_sysroot_multiarch_headers" "$script" >/dev/null || fail "script should install multiarch headers"
 grep -F "inspect_sysroot_headers" "$script" >/dev/null || fail "script should inspect sysroot headers"
 grep -F "sysroot header check" "$script" >/dev/null || fail "script should print sysroot header check"

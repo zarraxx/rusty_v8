@@ -158,11 +158,17 @@ prepare_sysroot() {
 
   docker start -a "$container_id"
   docker export "$container_id" | tar \
+    --anchored \
     --exclude=./dev/* \
+    --exclude=dev/* \
     --exclude=./proc/* \
+    --exclude=proc/* \
     --exclude=./run/* \
+    --exclude=run/* \
     --exclude=./sys/* \
+    --exclude=sys/* \
     --exclude=./tmp/* \
+    --exclude=tmp/* \
     -C "$tmp_root" \
     -xf -
   cleanup_container
