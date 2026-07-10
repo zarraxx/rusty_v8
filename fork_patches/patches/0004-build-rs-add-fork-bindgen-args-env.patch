@@ -1,0 +1,19 @@
+diff --git a/build.rs b/build.rs
+index 5065f71..0d781cc 100644
+--- a/build.rs
++++ b/build.rs
+@@ -214,6 +214,14 @@ fn build_binding() {
+     }
+   }
+ 
++  if let Ok(fork_bindgen_args) =
++    env::var("RUSTY_V8_FORK_BINDGEN_EXTRA_CLANG_ARGS")
++  {
++    clang_args.extend(
++      fork_bindgen_args.split_whitespace().map(ToString::to_string),
++    );
++  }
++
+   let bindings = bindgen::Builder::default()
+     .header("src/binding.hpp")
+     .parse_callbacks(Box::new(bindgen::CargoCallbacks::new()))

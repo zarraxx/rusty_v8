@@ -22,7 +22,7 @@ grep -F "clang_release_version=$clang_release_version" <<<"$output" >/dev/null |
 grep -F "clang_resource_include=$repo_root/.fork_build/cargo-target/riscv64gc-unknown-linux-gnu/debug/clang/lib/clang/$clang_release_version/include" <<<"$output" >/dev/null || fail "missing riscv64 clang resource include"
 grep -F "sysroot=$repo_root/.fork_build/sysroots/debian_trixie_riscv64-sysroot" <<<"$output" >/dev/null || fail "missing riscv64 sysroot"
 grep -F "gn_target_sysroot=//.fork_build/sysroots/debian_trixie_riscv64-sysroot" <<<"$output" >/dev/null || fail "missing riscv64 GN target sysroot"
-grep -F "bindgen_target_env=BINDGEN_EXTRA_CLANG_ARGS_riscv64gc_unknown_linux_gnu" <<<"$output" >/dev/null || fail "missing riscv64 bindgen target env"
+grep -F "fork_bindgen_extra_clang_args_env=RUSTY_V8_FORK_BINDGEN_EXTRA_CLANG_ARGS" <<<"$output" >/dev/null || fail "missing riscv64 fork bindgen env"
 grep -F "bindgen_extra_clang_args=--target=riscv64-unknown-linux-gnu --sysroot=$repo_root/.fork_build/sysroots/debian_trixie_riscv64-sysroot -isystem$repo_root/.fork_build/cargo-target/riscv64gc-unknown-linux-gnu/debug/clang/lib/clang/$clang_release_version/include -isystem$repo_root/.fork_build/sysroots/debian_trixie_riscv64-sysroot/usr/include -isystem$repo_root/.fork_build/sysroots/debian_trixie_riscv64-sysroot/usr/include/riscv64-linux-gnu" <<<"$output" >/dev/null || fail "missing riscv64 bindgen args"
 
 output="$("$script" --dry-run loongarch64)"
@@ -35,7 +35,7 @@ grep -F "clang_release_version=$clang_release_version" <<<"$output" >/dev/null |
 grep -F "clang_resource_include=$repo_root/.fork_build/cargo-target/loongarch64-unknown-linux-gnu/debug/clang/lib/clang/$clang_release_version/include" <<<"$output" >/dev/null || fail "missing loong64 clang resource include"
 grep -F "sysroot=$repo_root/.fork_build/sysroots/debian_trixie_loong64-sysroot" <<<"$output" >/dev/null || fail "missing loong64 sysroot"
 grep -F "gn_target_sysroot=//.fork_build/sysroots/debian_trixie_loong64-sysroot" <<<"$output" >/dev/null || fail "missing loong64 GN target sysroot"
-grep -F "bindgen_target_env=BINDGEN_EXTRA_CLANG_ARGS_loongarch64_unknown_linux_gnu" <<<"$output" >/dev/null || fail "missing loong64 bindgen target env"
+grep -F "fork_bindgen_extra_clang_args_env=RUSTY_V8_FORK_BINDGEN_EXTRA_CLANG_ARGS" <<<"$output" >/dev/null || fail "missing loong64 fork bindgen env"
 grep -F "bindgen_extra_clang_args=--target=loongarch64-unknown-linux-gnu --sysroot=$repo_root/.fork_build/sysroots/debian_trixie_loong64-sysroot -isystem$repo_root/.fork_build/cargo-target/loongarch64-unknown-linux-gnu/debug/clang/lib/clang/$clang_release_version/include -isystem$repo_root/.fork_build/sysroots/debian_trixie_loong64-sysroot/usr/include -isystem$repo_root/.fork_build/sysroots/debian_trixie_loong64-sysroot/usr/include/loongarch64-linux-gnu" <<<"$output" >/dev/null || fail "missing loong64 bindgen args"
 
 output="$("$script" --build --release --dry-run loongarch64)"
@@ -90,7 +90,7 @@ output="$("$script" --build --dry-run loongarch64)"
 grep -F "build=1" <<<"$output" >/dev/null || fail "missing build mode"
 grep -F "gn_cpu=loong64" <<<"$output" >/dev/null || fail "missing loong64 gn cpu"
 grep -F "cargo_target_dir=$repo_root/.fork_build/cargo-target" <<<"$output" >/dev/null || fail "missing cargo target dir"
-grep -F "fork_patches=$repo_root/fork_patches/patches/0001-build-config-add-loong64-sysroot.patch $repo_root/fork_patches/patches/0002-build-config-skip-loong64-clang-builtins.patch $repo_root/fork_patches/patches/0003-build-config-add-debian-multiarch-includes.patch" <<<"$output" >/dev/null || fail "missing fork patches"
+grep -F "fork_patches=$repo_root/fork_patches/patches/0001-build-config-add-loong64-sysroot.patch $repo_root/fork_patches/patches/0002-build-config-skip-loong64-clang-builtins.patch $repo_root/fork_patches/patches/0003-build-config-add-debian-multiarch-includes.patch $repo_root/fork_patches/patches/0004-build-rs-add-fork-bindgen-args-env.patch" <<<"$output" >/dev/null || fail "missing fork patches"
 grep -F "host_sysroot=$repo_root/.fork_build/sysroots/debian_bullseye_amd64-sysroot" <<<"$output" >/dev/null || fail "missing host sysroot"
 grep -F "host_multiarch_include=x86_64-linux-gnu" <<<"$output" >/dev/null || fail "missing host multiarch include"
 grep -F "host_tools_dir=$repo_root/.fork_build/bin" <<<"$output" >/dev/null || fail "missing host tools dir"
@@ -116,9 +116,14 @@ grep -F "sys/cdefs.h" "$script" >/dev/null || fail "script should verify sys/cde
 grep -F ".git/info/exclude" "$script" >/dev/null || fail "script should update local git exclude"
 grep -F ".fork_build/" "$script" >/dev/null || fail "script should ignore fork build directory"
 grep -F "unset BINDGEN_EXTRA_CLANG_ARGS" "$script" >/dev/null || fail "script should avoid global bindgen args for host bindgen"
+grep -F 'unset "$bindgen_target_env"' "$script" >/dev/null || fail "script should avoid target bindgen args for host bindgen"
 if grep -F "export BINDGEN_EXTRA_CLANG_ARGS=" "$script" >/dev/null; then
   fail "script should not append target clang args to global bindgen args"
 fi
+if grep -F 'export "$bindgen_target_env=' "$script" >/dev/null; then
+  fail "script should not append target clang args to target bindgen args"
+fi
+grep -F "RUSTY_V8_FORK_BINDGEN_EXTRA_CLANG_ARGS" "$script" >/dev/null || fail "script should export fork bindgen args"
 
 [[ -f "$workflow" ]] || fail "missing fork cross release workflow"
 grep -F "name: fork-cross-release" "$workflow" >/dev/null || fail "missing workflow name"
@@ -143,3 +148,8 @@ grep -F 'loongarch64-linux-gnu' "$multiarch_patch" >/dev/null || fail "missing l
 grep -F 'current_cpu == "riscv64"' "$multiarch_patch" >/dev/null || fail "missing riscv64 multiarch mapping"
 grep -F 'riscv64-linux-gnu' "$multiarch_patch" >/dev/null || fail "missing riscv64 multiarch include"
 grep -F 'usr/include/$_multiarch_include' "$multiarch_patch" >/dev/null || fail "missing sysroot multiarch include path"
+
+fork_bindgen_patch="$repo_root/fork_patches/patches/0004-build-rs-add-fork-bindgen-args-env.patch"
+[[ -f "$fork_bindgen_patch" ]] || fail "missing fork bindgen args patch"
+grep -F 'RUSTY_V8_FORK_BINDGEN_EXTRA_CLANG_ARGS' "$fork_bindgen_patch" >/dev/null || fail "missing fork bindgen env in patch"
+grep -F 'split_whitespace' "$fork_bindgen_patch" >/dev/null || fail "missing fork bindgen arg parsing"
