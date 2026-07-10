@@ -158,11 +158,11 @@ prepare_sysroot() {
 
   docker start -a "$container_id"
   docker export "$container_id" | tar \
-    --exclude=dev/* \
-    --exclude=proc/* \
-    --exclude=run/* \
-    --exclude=sys/* \
-    --exclude=tmp/* \
+    --exclude=./dev/* \
+    --exclude=./proc/* \
+    --exclude=./run/* \
+    --exclude=./sys/* \
+    --exclude=./tmp/* \
     -C "$tmp_root" \
     -xf -
   cleanup_container
@@ -198,6 +198,26 @@ install_sysroot_multiarch_headers() {
     find "$include_dir" -maxdepth 3 \( -path "*/sys/cdefs.h" -o -path "*/features.h" \) -print >&2
     exit 1
   fi
+}
+
+inspect_sysroot_headers() {
+  local sysroot_path="$1"
+  local multiarch="$2"
+  local include_dir="$sysroot_path/usr/include"
+
+  echo "sysroot header check: $sysroot_path"
+  ls -ld \
+    "$include_dir" \
+    "$include_dir/features.h" \
+    "$include_dir/$multiarch" \
+    "$include_dir/$multiarch/sys" \
+    "$include_dir/$multiarch/sys/cdefs.h" \
+    "$include_dir/sys" \
+    "$include_dir/sys/cdefs.h"
+  find "$include_dir" -maxdepth 3 \( \
+    -path "*/features.h" -o \
+    -path "*/sys/cdefs.h" \
+  \) -print | sort
 }
 
 write_host_tools() {
@@ -271,6 +291,7 @@ prepare_sysroot \
   "$rust_target" \
   ".debian_trixie_${sysroot_suffix}-sysroot.tmp"
 install_sysroot_multiarch_headers "$sysroot" "$multiarch_include"
+inspect_sysroot_headers "$sysroot" "$multiarch_include"
 
 if [[ "$build" == 0 ]]; then
   exit 0
@@ -285,6 +306,7 @@ prepare_sysroot \
   "x86_64-unknown-linux-gnu" \
   ".debian_bullseye_amd64-sysroot.tmp"
 install_sysroot_multiarch_headers "$host_sysroot" "$host_multiarch_include"
+inspect_sysroot_headers "$host_sysroot" "$host_multiarch_include"
 
 write_host_tools
 
