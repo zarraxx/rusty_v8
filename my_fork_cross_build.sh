@@ -78,6 +78,7 @@ host_stamp="$host_sysroot/.my_fork_sysroot_stamp"
 cargo_target_dir="$build_dir/cargo-target"
 host_tools_dir="$build_dir/bin"
 multiarch_include="${system_libdir#lib/}"
+host_multiarch_include="x86_64-linux-gnu"
 clang_release_version="$(sed -n "s/^RELEASE_VERSION = '\([^']*\)'.*/\1/p" "$repo_root/tools/clang/scripts/update.py" | head -n1)"
 if [[ -z "$clang_release_version" ]]; then
   echo "failed to read Chromium clang release version" >&2
@@ -173,6 +174,22 @@ prepare_sysroot() {
   echo "created sysroot: $sysroot_path"
 }
 
+link_sysroot_multiarch_headers() {
+  local sysroot_path="$1"
+  local multiarch="$2"
+  local include_dir="$sysroot_path/usr/include"
+  local multiarch_dir="$include_dir/$multiarch"
+  local header_dir
+
+  [[ -d "$multiarch_dir" ]] || return
+
+  for header_dir in bits gnu sys asm; do
+    if [[ -e "$multiarch_dir/$header_dir" && ! -e "$include_dir/$header_dir" ]]; then
+      ln -s "$multiarch/$header_dir" "$include_dir/$header_dir"
+    fi
+  done
+}
+
 write_host_tools() {
   mkdir -p "$host_tools_dir"
   cat >"$host_tools_dir/pkg-config" <<EOF
@@ -220,6 +237,7 @@ if [[ "$dry_run" == 1 ]]; then
   printf 'sysroot=%s\n' "$sysroot"
   printf 'gn_target_sysroot=%s\n' "$gn_target_sysroot"
   printf 'host_sysroot=%s\n' "$host_sysroot"
+  printf 'host_multiarch_include=%s\n' "$host_multiarch_include"
   printf 'host_tools_dir=%s\n' "$host_tools_dir"
   printf 'image=%s\n' "$image"
   printf 'stamp=%s\n' "$stamp"
@@ -242,6 +260,7 @@ prepare_sysroot \
   "$debian_arch" \
   "$rust_target" \
   ".debian_trixie_${sysroot_suffix}-sysroot.tmp"
+link_sysroot_multiarch_headers "$sysroot" "$multiarch_include"
 
 if [[ "$build" == 0 ]]; then
   exit 0
@@ -255,6 +274,7 @@ prepare_sysroot \
   "amd64" \
   "x86_64-unknown-linux-gnu" \
   ".debian_bullseye_amd64-sysroot.tmp"
+link_sysroot_multiarch_headers "$host_sysroot" "$host_multiarch_include"
 
 write_host_tools
 

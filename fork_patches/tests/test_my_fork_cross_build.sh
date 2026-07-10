@@ -90,6 +90,7 @@ grep -F "gn_cpu=loong64" <<<"$output" >/dev/null || fail "missing loong64 gn cpu
 grep -F "cargo_target_dir=$repo_root/.fork_build/cargo-target" <<<"$output" >/dev/null || fail "missing cargo target dir"
 grep -F "fork_patches=$repo_root/fork_patches/patches/0001-build-config-add-loong64-sysroot.patch $repo_root/fork_patches/patches/0002-build-config-skip-loong64-clang-builtins.patch $repo_root/fork_patches/patches/0003-build-config-add-debian-multiarch-includes.patch" <<<"$output" >/dev/null || fail "missing fork patches"
 grep -F "host_sysroot=$repo_root/.fork_build/sysroots/debian_bullseye_amd64-sysroot" <<<"$output" >/dev/null || fail "missing host sysroot"
+grep -F "host_multiarch_include=x86_64-linux-gnu" <<<"$output" >/dev/null || fail "missing host multiarch include"
 grep -F "host_tools_dir=$repo_root/.fork_build/bin" <<<"$output" >/dev/null || fail "missing host tools dir"
 grep -F 'target_cpu="loong64"' <<<"$output" >/dev/null || fail "missing target_cpu GN arg"
 grep -F 'v8_target_cpu="loong64"' <<<"$output" >/dev/null || fail "missing v8_target_cpu GN arg"
@@ -100,6 +101,8 @@ grep -F "pkg_config=\"$repo_root/.fork_build/bin/pkg-config\"" <<<"$output" >/de
 grep -F "host_pkg_config=\"$repo_root/.fork_build/bin/pkg-config\"" <<<"$output" >/dev/null || fail "missing host_pkg_config GN arg"
 
 grep -F -- "--exclude=dev/*" "$script" >/dev/null || fail "sysroot export should skip device nodes"
+grep -F "link_sysroot_multiarch_headers" "$script" >/dev/null || fail "script should link multiarch headers"
+grep -F "for header_dir in bits gnu sys asm" "$script" >/dev/null || fail "script should link libc multiarch header dirs"
 grep -F ".git/info/exclude" "$script" >/dev/null || fail "script should update local git exclude"
 grep -F ".fork_build/" "$script" >/dev/null || fail "script should ignore fork build directory"
 
