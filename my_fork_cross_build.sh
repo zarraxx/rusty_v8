@@ -88,6 +88,7 @@ bindgen_extra_clang_args="--target=$clang_target --sysroot=$sysroot -isystem$cla
 fork_patches=(
   "$repo_root/fork_patches/patches/0001-build-config-add-loong64-sysroot.patch"
   "$repo_root/fork_patches/patches/0002-build-config-skip-loong64-clang-builtins.patch"
+  "$repo_root/fork_patches/patches/0003-build-config-add-debian-multiarch-includes.patch"
 )
 fork_gn_args="target_os=\"linux\" target_cpu=\"$gn_cpu\" v8_target_cpu=\"$gn_cpu\" use_sysroot=true target_sysroot=\"$gn_target_sysroot\" target_sysroot_dir=\"//.fork_build/sysroots\" system_libdir=\"$system_libdir\" pkg_config=\"$host_tools_dir/pkg-config\" host_pkg_config=\"$host_tools_dir/pkg-config\""
 
