@@ -51,6 +51,7 @@ grep -F "unsupported architecture: x86_64" /tmp/my_fork_cross_build_invalid.out 
 
 output="$("$script" --dry-run loongarch64)"
 grep -F "image=ghcr.io/zarraxx/debian:trixie" <<<"$output" >/dev/null || fail "missing image"
+grep -F "host_image=debian:bullseye" <<<"$output" >/dev/null || fail "missing host image"
 grep -F "stamp=$repo_root/.fork_build/sysroots/debian_trixie_loong64-sysroot/.my_fork_sysroot_stamp" <<<"$output" >/dev/null || fail "missing stamp"
 grep -F "packages=build-essential ca-certificates libc6-dev libglib2.0-dev pkg-config python3" <<<"$output" >/dev/null || fail "missing packages"
 
@@ -79,6 +80,7 @@ fi
 for arch in riscv64 loongarch64; do
   output="$("$script" --dry-run "$arch")"
   grep -F "image=ghcr.io/zarraxx/debian:trixie" <<<"$output" >/dev/null || fail "missing image for $arch"
+  grep -F "host_image=debian:bullseye" <<<"$output" >/dev/null || fail "missing host image for $arch"
   grep -F ".fork_build/sysroots/debian_trixie_" <<<"$output" >/dev/null || fail "missing fork build sysroot for $arch"
 done
 

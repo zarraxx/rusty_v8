@@ -72,6 +72,7 @@ sysroot="$build_dir/sysroots/debian_trixie_${sysroot_suffix}-sysroot"
 gn_target_sysroot="//.fork_build/sysroots/debian_trixie_${sysroot_suffix}-sysroot"
 host_sysroot="$build_dir/sysroots/debian_bullseye_amd64-sysroot"
 image="ghcr.io/zarraxx/debian:trixie"
+host_image="debian:bullseye"
 packages=(build-essential ca-certificates libc6-dev libglib2.0-dev pkg-config python3)
 stamp="$sysroot/.my_fork_sysroot_stamp"
 host_stamp="$host_sysroot/.my_fork_sysroot_stamp"
@@ -106,12 +107,13 @@ ensure_fork_build_ignored() {
 }
 
 stamp_content() {
-  local stamp_arch="$1"
-  local stamp_platform="$2"
-  local stamp_debian_arch="$3"
-  local stamp_rust_target="$4"
+  local stamp_image="$1"
+  local stamp_arch="$2"
+  local stamp_platform="$3"
+  local stamp_debian_arch="$4"
+  local stamp_rust_target="$5"
 
-  printf 'image=%s\n' "$image"
+  printf 'image=%s\n' "$stamp_image"
   printf 'arch=%s\n' "$stamp_arch"
   printf 'docker_platform=%s\n' "$stamp_platform"
   printf 'debian_arch=%s\n' "$stamp_debian_arch"
@@ -122,15 +124,16 @@ stamp_content() {
 prepare_sysroot() {
   local sysroot_path="$1"
   local stamp_path="$2"
-  local stamp_arch="$3"
-  local stamp_platform="$4"
-  local stamp_debian_arch="$5"
-  local stamp_rust_target="$6"
-  local tmp_name="$7"
+  local stamp_image="$3"
+  local stamp_arch="$4"
+  local stamp_platform="$5"
+  local stamp_debian_arch="$6"
+  local stamp_rust_target="$7"
+  local tmp_name="$8"
 
   local need_sysroot=1
   if [[ -f "$stamp_path" ]] &&
-    diff -u "$stamp_path" <(stamp_content "$stamp_arch" "$stamp_platform" "$stamp_debian_arch" "$stamp_rust_target") >/dev/null; then
+    diff -u "$stamp_path" <(stamp_content "$stamp_image" "$stamp_arch" "$stamp_platform" "$stamp_debian_arch" "$stamp_rust_target") >/dev/null; then
     need_sysroot=0
   fi
 
@@ -151,7 +154,7 @@ prepare_sysroot() {
   local install_cmd="apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ${packages[*]} && apt-get clean && rm -rf /var/lib/apt/lists/*"
   local container_id
   container_id="$(
-    docker create --platform "$stamp_platform" "$image" bash -lc "$install_cmd"
+    docker create --platform "$stamp_platform" "$stamp_image" bash -lc "$install_cmd"
   )"
 
   cleanup_container() {
@@ -179,7 +182,7 @@ prepare_sysroot() {
 
   rm -rf "$sysroot_path"
   mv "$tmp_root" "$sysroot_path"
-  stamp_content "$stamp_arch" "$stamp_platform" "$stamp_debian_arch" "$stamp_rust_target" >"$stamp_path"
+  stamp_content "$stamp_image" "$stamp_arch" "$stamp_platform" "$stamp_debian_arch" "$stamp_rust_target" >"$stamp_path"
   echo "created sysroot: $sysroot_path"
 }
 
@@ -279,6 +282,7 @@ if [[ "$dry_run" == 1 ]]; then
   printf 'host_multiarch_include=%s\n' "$host_multiarch_include"
   printf 'host_tools_dir=%s\n' "$host_tools_dir"
   printf 'image=%s\n' "$image"
+  printf 'host_image=%s\n' "$host_image"
   printf 'stamp=%s\n' "$stamp"
   printf 'packages=%s\n' "${packages[*]}"
   printf 'cargo_target_dir=%s\n' "$cargo_target_dir"
@@ -295,6 +299,7 @@ mkdir -p "$build_dir/sysroots"
 prepare_sysroot \
   "$sysroot" \
   "$stamp" \
+  "$image" \
   "$arch" \
   "$docker_platform" \
   "$debian_arch" \
@@ -310,6 +315,7 @@ fi
 prepare_sysroot \
   "$host_sysroot" \
   "$host_stamp" \
+  "$host_image" \
   "amd64" \
   "linux/amd64" \
   "amd64" \
