@@ -1,0 +1,14 @@
+diff --git a/build/config/clang/BUILD.gn b/build/config/clang/BUILD.gn
+index a6b6846e57..92a5c6ba82 100644
+--- a/build/config/clang/BUILD.gn
++++ b/build/config/clang/BUILD.gn
+@@ -267,7 +267,8 @@ clang_lib("compiler_builtins") {
+     } else {
+       assert(false, "unsupported target_platform=$target_platform")
+     }
+-  } else if (current_cpu != "ppc64" && current_cpu != "s390x") {
++  } else if (current_cpu != "loong64" && current_cpu != "ppc64" &&
++             current_cpu != "s390x") {
+     libname = "builtins"
+   }
+ }

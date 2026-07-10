@@ -1,0 +1,158 @@
+name: fork-cross-release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Upstream rusty_v8 tag, for example v149.2.0 or 149.2.0
+        required: true
+        type: string
+      arch:
+        description: Target architecture
+        required: true
+        type: choice
+        options:
+          - loongarch64
+          - riscv64
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: ${{ inputs.arch }} ${{ inputs.tag }}
+    runs-on: ubuntu-22.04
+    timeout-minutes: 360
+
+    steps:
+      - name: Resolve upstream tag
+        id: resolve_tag
+        run: |
+          set -euo pipefail
+          input_tag="${{ inputs.tag }}"
+          if git ls-remote --exit-code --tags https://github.com/denoland/rusty_v8 "refs/tags/${input_tag}" >/dev/null 2>&1; then
+            resolved_tag="$input_tag"
+          elif git ls-remote --exit-code --tags https://github.com/denoland/rusty_v8 "refs/tags/v${input_tag}" >/dev/null 2>&1; then
+            resolved_tag="v${input_tag}"
+          else
+            echo "Could not find upstream tag: ${input_tag}" >&2
+            exit 1
+          fi
+          echo "tag=${resolved_tag}" >> "$GITHUB_OUTPUT"
+
+      - name: Resolve target
+        id: target
+        run: |
+          set -euo pipefail
+          case "${{ inputs.arch }}" in
+            loongarch64)
+              echo "rust_target=loongarch64-unknown-linux-gnu" >> "$GITHUB_OUTPUT"
+              ;;
+            riscv64)
+              echo "rust_target=riscv64gc-unknown-linux-gnu" >> "$GITHUB_OUTPUT"
+              ;;
+            *)
+              echo "Unsupported architecture: ${{ inputs.arch }}" >&2
+              exit 1
+              ;;
+          esac
+
+      - name: Checkout upstream tag
+        uses: actions/checkout@v4
+        with:
+          repository: denoland/rusty_v8
+          ref: ${{ steps.resolve_tag.outputs.tag }}
+          path: upstream
+          submodules: recursive
+          fetch-depth: 1
+
+      - name: Checkout fork tools
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository }}
+          ref: ${{ github.ref_name }}
+          path: fork-tools
+          fetch-depth: 1
+
+      - name: Inject fork scripts and patches
+        working-directory: upstream
+        run: |
+          set -euo pipefail
+          cp ../fork-tools/my_fork_cross_build.sh ./my_fork_cross_build.sh
+          rm -rf ./fork_patches
+          cp -R ../fork-tools/fork_patches ./fork_patches
+          chmod +x ./my_fork_cross_build.sh
+
+      - name: Install QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: riscv64,loong64
+
+      - name: Install host dependencies
+        working-directory: upstream
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            ca-certificates curl gnupg pkg-config python3
+
+          echo "deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy-19 main" | \
+            sudo tee /etc/apt/sources.list.d/llvm-toolchain-jammy-19.list
+          curl -fsSL https://apt.llvm.org/llvm-snapshot.gpg.key | \
+            gpg --dearmor | \
+            sudo tee /etc/apt/trusted.gpg.d/llvm-snapshot.gpg >/dev/null
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            clang-19 lld-19 libclang-19-dev
+          echo "LIBCLANG_PATH=/usr/lib/llvm-19/lib" >> "$GITHUB_ENV"
+
+      - name: Install Rust nightly
+        run: |
+          set -euo pipefail
+          rustup toolchain install nightly --profile minimal
+          rustup default nightly
+          rustc -vV
+
+      - name: Cross build
+        working-directory: upstream
+        env:
+          RUST_BACKTRACE: "1"
+        run: |
+          set -euo pipefail
+          ./my_fork_cross_build.sh --build --release "${{ inputs.arch }}"
+
+      - name: Package artifacts
+        id: package
+        run: |
+          set -euo pipefail
+          rust_target="${{ steps.target.outputs.rust_target }}"
+          artifact_dir="$GITHUB_WORKSPACE/artifacts"
+          mkdir -p "$artifact_dir"
+
+          lib="upstream/.fork_build/cargo-target/${rust_target}/release/gn_out/obj/librusty_v8.a"
+          binding="upstream/.fork_build/cargo-target/${rust_target}/release/gn_out/src_binding.rs"
+          test -f "$lib"
+          test -f "$binding"
+
+          gzip -9c "$lib" > "$artifact_dir/librusty_v8_release_${rust_target}.a.gz"
+          cp "$binding" "$artifact_dir/src_binding_release_${rust_target}.rs"
+          sha256sum "$artifact_dir"/* > "$artifact_dir/SHA256SUMS"
+          ls -lh "$artifact_dir"
+          echo "artifact_dir=${artifact_dir}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload workflow artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: rusty_v8-${{ steps.resolve_tag.outputs.tag }}-${{ inputs.arch }}
+          path: artifacts/*
+          if-no-files-found: error
+
+      - name: Upload release assets
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.resolve_tag.outputs.tag }}
+          name: rusty_v8 ${{ steps.resolve_tag.outputs.tag }} fork cross assets
+          files: artifacts/*
+          fail_on_unmatched_files: true
+          overwrite_files: true
+          make_latest: false
