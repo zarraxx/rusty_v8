@@ -62,6 +62,9 @@ if [[ ! -d "$sysroot" ]]; then
   created_test_sysroot=1
   mkdir -p "$sysroot"
 fi
+mkdir -p "$sysroot/usr/include/riscv64-linux-gnu/sys"
+touch "$sysroot/usr/include/features.h"
+touch "$sysroot/usr/include/riscv64-linux-gnu/sys/cdefs.h"
 cat >"$stamp" <<'STAMP'
 image=ghcr.io/zarraxx/debian:trixie
 arch=riscv64
@@ -111,6 +114,8 @@ grep -F -- "--exclude=./sys/*" "$script" >/dev/null || fail "sysroot export shou
 grep -F -- "--exclude=sys/*" "$script" >/dev/null || fail "sysroot export should skip root sysfs from docker export"
 grep -F "install_sysroot_multiarch_headers" "$script" >/dev/null || fail "script should install multiarch headers"
 grep -F "inspect_sysroot_headers" "$script" >/dev/null || fail "script should inspect sysroot headers"
+grep -F "normalize_sysroot_symlinks" "$script" >/dev/null || fail "script should normalize sysroot symlinks"
+grep -F "realpath --relative-to" "$script" >/dev/null || fail "script should rewrite absolute sysroot symlinks"
 grep -F "sysroot header check" "$script" >/dev/null || fail "script should print sysroot header check"
 grep -F "ls -ld" "$script" >/dev/null || fail "script should list sysroot header paths"
 grep -F "for header_dir in bits gnu sys asm" "$script" >/dev/null || fail "script should install libc multiarch header dirs"
@@ -126,6 +131,10 @@ if grep -F 'export "$bindgen_target_env=' "$script" >/dev/null; then
   fail "script should not append target clang args to target bindgen args"
 fi
 grep -F "RUSTY_V8_FORK_BINDGEN_EXTRA_CLANG_ARGS" "$script" >/dev/null || fail "script should export fork bindgen args"
+grep -F 'host_sysroot/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2' "$script" >/dev/null || fail "pkg-config wrapper should use sysroot-relative dynamic loader"
+if grep -F 'host_sysroot/lib64/ld-linux-x86-64.so.2' "$script" >/dev/null; then
+  fail "pkg-config wrapper should not rely on absolute lib64 loader symlink"
+fi
 
 [[ -f "$workflow" ]] || fail "missing fork cross release workflow"
 grep -F "name: fork-cross-release" "$workflow" >/dev/null || fail "missing workflow name"

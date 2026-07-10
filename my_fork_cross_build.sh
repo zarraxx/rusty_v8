@@ -212,6 +212,23 @@ install_sysroot_multiarch_headers() {
   fi
 }
 
+normalize_sysroot_symlinks() {
+  local sysroot_path="$1"
+  local link_path
+  local link_target
+  local relative_target
+
+  while IFS= read -r -d '' link_path; do
+    link_target="$(readlink "$link_path")"
+    [[ "$link_target" == /* ]] || continue
+    [[ -e "$sysroot_path$link_target" ]] || continue
+
+    relative_target="$(realpath --relative-to="$(dirname "$link_path")" "$sysroot_path$link_target")"
+    ln -snf "$relative_target" "$link_path"
+    echo "normalized sysroot symlink: $link_path -> $relative_target"
+  done < <(find "$sysroot_path" -type l -print0)
+}
+
 inspect_sysroot_headers() {
   local sysroot_path="$1"
   local multiarch="$2"
@@ -256,7 +273,7 @@ if [[ -n "\${PKG_CONFIG_LIBDIR:-}" ]]; then
   done
   export PKG_CONFIG_LIBDIR="\$pkg_config_libdir"
 fi
-exec "\$host_sysroot/lib64/ld-linux-x86-64.so.2" \\
+exec "\$host_sysroot/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2" \\
   --library-path "\$host_sysroot/usr/lib/x86_64-linux-gnu:\$host_sysroot/lib/x86_64-linux-gnu" \\
   "\$host_sysroot/usr/bin/pkg-config" "\$@"
 EOF
@@ -306,6 +323,7 @@ prepare_sysroot \
   "$rust_target" \
   ".debian_trixie_${sysroot_suffix}-sysroot.tmp"
 install_sysroot_multiarch_headers "$sysroot" "$multiarch_include"
+normalize_sysroot_symlinks "$sysroot"
 inspect_sysroot_headers "$sysroot" "$multiarch_include"
 
 if [[ "$build" == 0 ]]; then
@@ -322,6 +340,7 @@ prepare_sysroot \
   "x86_64-unknown-linux-gnu" \
   ".debian_bullseye_amd64-sysroot.tmp"
 install_sysroot_multiarch_headers "$host_sysroot" "$host_multiarch_include"
+normalize_sysroot_symlinks "$host_sysroot"
 inspect_sysroot_headers "$host_sysroot" "$host_multiarch_include"
 
 write_host_tools
