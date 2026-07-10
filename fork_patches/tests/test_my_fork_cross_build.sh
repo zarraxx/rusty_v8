@@ -100,6 +100,8 @@ grep -F "pkg_config=\"$repo_root/.fork_build/bin/pkg-config\"" <<<"$output" >/de
 grep -F "host_pkg_config=\"$repo_root/.fork_build/bin/pkg-config\"" <<<"$output" >/dev/null || fail "missing host_pkg_config GN arg"
 
 grep -F -- "--exclude=dev/*" "$script" >/dev/null || fail "sysroot export should skip device nodes"
+grep -F ".git/info/exclude" "$script" >/dev/null || fail "script should update local git exclude"
+grep -F ".fork_build/" "$script" >/dev/null || fail "script should ignore fork build directory"
 
 [[ -f "$workflow" ]] || fail "missing fork cross release workflow"
 grep -F "name: fork-cross-release" "$workflow" >/dev/null || fail "missing workflow name"

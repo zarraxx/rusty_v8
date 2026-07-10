@@ -91,6 +91,15 @@ fork_patches=(
 )
 fork_gn_args="target_os=\"linux\" target_cpu=\"$gn_cpu\" v8_target_cpu=\"$gn_cpu\" use_sysroot=true target_sysroot=\"$gn_target_sysroot\" target_sysroot_dir=\"//.fork_build/sysroots\" system_libdir=\"$system_libdir\" pkg_config=\"$host_tools_dir/pkg-config\" host_pkg_config=\"$host_tools_dir/pkg-config\""
 
+ensure_fork_build_ignored() {
+  local exclude_file="$repo_root/.git/info/exclude"
+  if [[ -d "$repo_root/.git" ]]; then
+    mkdir -p "$(dirname "$exclude_file")"
+    grep -Fx ".fork_build/" "$exclude_file" >/dev/null 2>&1 ||
+      printf '.fork_build/\n' >>"$exclude_file"
+  fi
+}
+
 stamp_content() {
   local stamp_arch="$1"
   local stamp_platform="$2"
@@ -221,6 +230,7 @@ if [[ "$dry_run" == 1 ]]; then
   exit 0
 fi
 
+ensure_fork_build_ignored
 mkdir -p "$build_dir/sysroots"
 
 prepare_sysroot \
