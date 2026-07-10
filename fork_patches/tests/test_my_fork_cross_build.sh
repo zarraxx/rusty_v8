@@ -99,6 +99,8 @@ grep -F 'system_libdir="lib/loongarch64-linux-gnu"' <<<"$output" >/dev/null || f
 grep -F "pkg_config=\"$repo_root/.fork_build/bin/pkg-config\"" <<<"$output" >/dev/null || fail "missing pkg_config GN arg"
 grep -F "host_pkg_config=\"$repo_root/.fork_build/bin/pkg-config\"" <<<"$output" >/dev/null || fail "missing host_pkg_config GN arg"
 
+grep -F -- "--exclude=dev/*" "$script" >/dev/null || fail "sysroot export should skip device nodes"
+
 [[ -f "$workflow" ]] || fail "missing fork cross release workflow"
 grep -F "name: fork-cross-release" "$workflow" >/dev/null || fail "missing workflow name"
 grep -F "workflow_dispatch:" "$workflow" >/dev/null || fail "missing workflow_dispatch"

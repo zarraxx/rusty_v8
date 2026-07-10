@@ -146,7 +146,14 @@ prepare_sysroot() {
   trap cleanup_container EXIT
 
   docker start -a "$container_id"
-  docker export "$container_id" | tar -C "$tmp_root" -xf -
+  docker export "$container_id" | tar \
+    --exclude=dev/* \
+    --exclude=proc/* \
+    --exclude=run/* \
+    --exclude=sys/* \
+    --exclude=tmp/* \
+    -C "$tmp_root" \
+    -xf -
   cleanup_container
   trap - EXIT
 
