@@ -128,15 +128,25 @@ jobs:
           set -euo pipefail
           rust_target="${{ steps.target.outputs.rust_target }}"
           artifact_dir="$GITHUB_WORKSPACE/artifacts"
+          package_root="$RUNNER_TEMP/rusty_v8_release_package"
+          rm -rf "$artifact_dir" "$package_root"
           mkdir -p "$artifact_dir"
+          mkdir -p "$package_root"
 
           lib="upstream/.fork_build/cargo-target/${rust_target}/release/gn_out/obj/librusty_v8.a"
           binding="upstream/.fork_build/cargo-target/${rust_target}/release/gn_out/src_binding.rs"
           test -f "$lib"
           test -f "$binding"
 
-          gzip -9c "$lib" > "$artifact_dir/librusty_v8_release_${rust_target}.a.gz"
-          cp "$binding" "$artifact_dir/src_binding_release_${rust_target}.rs"
+          lib_name="librusty_v8_release_${rust_target}.a"
+          binding_name="src_binding_release_${rust_target}.rs"
+          tarball="rusty_v8-${{ steps.resolve_tag.outputs.tag }}-release-${rust_target}.tar.xz"
+
+          cp "$lib" "$package_root/$lib_name"
+          cp "$binding" "$package_root/$binding_name"
+          tar -cJf "$artifact_dir/$tarball" -C "$package_root" "$lib_name" "$binding_name"
+          gzip -9c "$lib" > "$artifact_dir/${lib_name}.gz"
+          cp "$binding" "$artifact_dir/$binding_name"
           sha256sum "$artifact_dir"/* > "$artifact_dir/SHA256SUMS"
           ls -lh "$artifact_dir"
           echo "artifact_dir=${artifact_dir}" >> "$GITHUB_OUTPUT"

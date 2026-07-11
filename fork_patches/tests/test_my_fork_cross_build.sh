@@ -146,6 +146,9 @@ grep -F "cp -R ../fork-tools/fork_patches ./fork_patches" "$workflow" >/dev/null
 grep -F "./my_fork_cross_build.sh --build --release \"\${{ inputs.arch }}\"" "$workflow" >/dev/null || fail "missing release build command"
 grep -F "actions/upload-artifact@v4" "$workflow" >/dev/null || fail "missing artifact upload"
 grep -F "softprops/action-gh-release" "$workflow" >/dev/null || fail "missing release upload"
+grep -F 'rusty_v8-${{ steps.resolve_tag.outputs.tag }}-release-${rust_target}.tar.xz' "$workflow" >/dev/null || fail "missing release tarball artifact"
+grep -F 'tar -cJf "$artifact_dir/$tarball"' "$workflow" >/dev/null || fail "missing release tarball packaging"
+grep -F 'overwrite_files: true' "$workflow" >/dev/null || fail "release upload should overwrite old assets"
 
 multiarch_patch="$repo_root/fork_patches/patches/0003-build-config-add-debian-multiarch-includes.patch"
 [[ -f "$multiarch_patch" ]] || fail "missing multiarch include patch"
