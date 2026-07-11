@@ -80,13 +80,7 @@ cargo_target_dir="$build_dir/cargo-target"
 host_tools_dir="$build_dir/bin"
 multiarch_include="${system_libdir#lib/}"
 host_multiarch_include="x86_64-linux-gnu"
-clang_release_version="$(sed -n "s/^RELEASE_VERSION = '\([^']*\)'.*/\1/p" "$repo_root/tools/clang/scripts/update.py" | head -n1)"
-if [[ -z "$clang_release_version" ]]; then
-  echo "failed to read Chromium clang release version" >&2
-  exit 1
-fi
-clang_resource_include="$cargo_target_dir/$rust_target/$profile/clang/lib/clang/$clang_release_version/include"
-bindgen_extra_clang_args="--target=$clang_target --sysroot=$sysroot -isystem$clang_resource_include -isystem$sysroot/usr/include -isystem$sysroot/usr/include/$multiarch_include"
+bindgen_extra_clang_args="--target=$clang_target --sysroot=$sysroot -isystem$sysroot/usr/include -isystem$sysroot/usr/include/$multiarch_include"
 bindgen_target_env="BINDGEN_EXTRA_CLANG_ARGS_${rust_target//-/_}"
 fork_bindgen_extra_clang_args_env="RUSTY_V8_FORK_BINDGEN_EXTRA_CLANG_ARGS"
 fork_patches=(
@@ -291,8 +285,6 @@ if [[ "$dry_run" == 1 ]]; then
   printf 'gn_cpu=%s\n' "$gn_cpu"
   printf 'system_libdir=%s\n' "$system_libdir"
   printf 'multiarch_include=%s\n' "$multiarch_include"
-  printf 'clang_release_version=%s\n' "$clang_release_version"
-  printf 'clang_resource_include=%s\n' "$clang_resource_include"
   printf 'sysroot=%s\n' "$sysroot"
   printf 'gn_target_sysroot=%s\n' "$gn_target_sysroot"
   printf 'host_sysroot=%s\n' "$host_sysroot"

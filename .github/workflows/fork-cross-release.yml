@@ -21,7 +21,7 @@ permissions:
 jobs:
   build:
     name: ${{ inputs.arch }} ${{ inputs.tag }}
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 360
 
     steps:
@@ -96,15 +96,16 @@ jobs:
           sudo apt-get install -y --no-install-recommends \
             ca-certificates curl gnupg pkg-config python3
 
-          echo "deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy-19 main" | \
-            sudo tee /etc/apt/sources.list.d/llvm-toolchain-jammy-19.list
+          echo "deb http://apt.llvm.org/noble/ llvm-toolchain-noble-21 main" | \
+            sudo tee /etc/apt/sources.list.d/llvm-toolchain-noble-21.list
           curl -fsSL https://apt.llvm.org/llvm-snapshot.gpg.key | \
             gpg --dearmor | \
             sudo tee /etc/apt/trusted.gpg.d/llvm-snapshot.gpg >/dev/null
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            clang-19 lld-19 libclang-19-dev
-          echo "LIBCLANG_PATH=/usr/lib/llvm-19/lib" >> "$GITHUB_ENV"
+            clang-21 lld-21 libclang-21-dev
+          clang-21 --version
+          echo "LIBCLANG_PATH=/usr/lib/llvm-21/lib" >> "$GITHUB_ENV"
 
       - name: Install Rust nightly
         run: |
