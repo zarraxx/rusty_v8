@@ -2,10 +2,7 @@ diff --git a/build.rs b/build.rs
 index 5065f71..0d781cc 100644
 --- a/build.rs
 +++ b/build.rs
-@@ -214,6 +214,14 @@ fn build_binding() {
-     }
-   }
- 
+@@ -215,3 +215,11 @@ fn build_binding() {
 +  if let Ok(fork_bindgen_args) =
 +    env::var("RUSTY_V8_FORK_BINDGEN_EXTRA_CLANG_ARGS")
 +  {

@@ -4,14 +4,28 @@ set -euo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 script="$repo_root/my_fork_cross_build.sh"
 workflow="$repo_root/.github/workflows/fork-cross-release.yml"
+expected_upstream_version="$(awk -F '"' '/^version = / { print $2; exit }' "$repo_root/Cargo.toml")"
 
 fail() {
   echo "FAIL: $*" >&2
   exit 1
 }
 
+check_bindgen_patch_fixture() {
+  local fixture_name="$1"
+  local fixture_body="$2"
+  local tmp_dir
+  tmp_dir="$(mktemp -d)"
+  git -C "$tmp_dir" init -q
+  printf '%s\n' "$fixture_body" >"$tmp_dir/build.rs"
+  git -C "$tmp_dir" apply --check "$repo_root/fork_patches/patches/0004-build-rs-add-fork-bindgen-args-env.patch" ||
+    fail "fork bindgen patch does not apply to $fixture_name build.rs shape"
+  rm -rf "$tmp_dir"
+}
+
 output="$("$script" --dry-run riscv64)"
 grep -F "profile=debug" <<<"$output" >/dev/null || fail "missing default debug profile"
+grep -F "upstream_version=$expected_upstream_version" <<<"$output" >/dev/null || fail "missing upstream version"
 grep -F "arch=riscv64" <<<"$output" >/dev/null || fail "missing riscv64 arch"
 grep -F "docker_platform=linux/riscv64" <<<"$output" >/dev/null || fail "missing riscv64 platform"
 grep -F "clang_target=riscv64-unknown-linux-gnu" <<<"$output" >/dev/null || fail "missing riscv64 clang target"
@@ -92,6 +106,7 @@ output="$("$script" --build --dry-run loongarch64)"
 grep -F "build=1" <<<"$output" >/dev/null || fail "missing build mode"
 grep -F "gn_cpu=loong64" <<<"$output" >/dev/null || fail "missing loong64 gn cpu"
 grep -F "cargo_target_dir=$repo_root/.fork_build/cargo-target" <<<"$output" >/dev/null || fail "missing cargo target dir"
+grep -F "fork_patch_ranges=149.2.0..|$repo_root/fork_patches/patches/0001-build-config-add-loong64-sysroot.patch 149.2.0..|$repo_root/fork_patches/patches/0002-build-config-skip-loong64-clang-builtins.patch 149.2.0..|$repo_root/fork_patches/patches/0003-build-config-add-debian-multiarch-includes.patch 149.2.0..|$repo_root/fork_patches/patches/0004-build-rs-add-fork-bindgen-args-env.patch" <<<"$output" >/dev/null || fail "missing fork patch version ranges"
 grep -F "fork_patches=$repo_root/fork_patches/patches/0001-build-config-add-loong64-sysroot.patch $repo_root/fork_patches/patches/0002-build-config-skip-loong64-clang-builtins.patch $repo_root/fork_patches/patches/0003-build-config-add-debian-multiarch-includes.patch $repo_root/fork_patches/patches/0004-build-rs-add-fork-bindgen-args-env.patch" <<<"$output" >/dev/null || fail "missing fork patches"
 grep -F "host_sysroot=$repo_root/.fork_build/sysroots/debian_bullseye_amd64-sysroot" <<<"$output" >/dev/null || fail "missing host sysroot"
 grep -F "host_multiarch_include=x86_64-linux-gnu" <<<"$output" >/dev/null || fail "missing host multiarch include"
@@ -164,6 +179,33 @@ fork_bindgen_patch="$repo_root/fork_patches/patches/0004-build-rs-add-fork-bindg
 [[ -f "$fork_bindgen_patch" ]] || fail "missing fork bindgen args patch"
 grep -F 'RUSTY_V8_FORK_BINDGEN_EXTRA_CLANG_ARGS' "$fork_bindgen_patch" >/dev/null || fail "missing fork bindgen env in patch"
 grep -F 'split_whitespace' "$fork_bindgen_patch" >/dev/null || fail "missing fork bindgen arg parsing"
+check_bindgen_patch_fixture "v150.1.0" 'fn build_binding() {
+  let mut clang_args = vec![];
+
+  let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap();
+  if target_os == "macos" {
+    clang_args.push("-isysroot".to_string());
+  } else if target_os == "linux" {
+    if let Ok(libclang_path) = env::var("LIBCLANG_PATH") {
+      clang_args.push(libclang_path);
+    }
+  } else if target_os == "ios" {
+    let target_triple = env::var("TARGET").unwrap();
+    let is_sim = target_triple.ends_with("-sim")
+      || target_triple.starts_with("x86_64-apple-ios");
+    let clang_target = if is_sim {
+      "arm64-apple-ios-simulator"
+    } else {
+      "arm64-apple-ios"
+    };
+    clang_args.push(format!("--target={clang_target}"));
+  }
+
+  let bindings = bindgen::Builder::default()
+    .header("src/binding.hpp")
+    .parse_callbacks(Box::new(bindgen::CargoCallbacks::new()))
+    .clang_args(clang_args);
+}'
 
 workflow="$repo_root/.github/workflows/fork-cross-release.yml"
 [[ -f "$workflow" ]] || fail "missing fork cross release workflow"

@@ -14,6 +14,46 @@ build=0
 profile="debug"
 cargo_profile_args=()
 
+read_upstream_version() {
+  awk -F '"' '/^version = / { print $2; exit }' "$repo_root/Cargo.toml"
+}
+
+version_key() {
+  local version="${1#v}"
+  local major
+  local minor
+  local patch
+
+  if [[ "$version" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+) ]]; then
+    major="${BASH_REMATCH[1]}"
+    minor="${BASH_REMATCH[2]}"
+    patch="${BASH_REMATCH[3]}"
+  else
+    echo "unsupported upstream version format: $1" >&2
+    exit 1
+  fi
+
+  printf '%05d%05d%05d\n' "$major" "$minor" "$patch"
+}
+
+version_lt() {
+  [[ "$(version_key "$1")" < "$(version_key "$2")" ]]
+}
+
+version_in_range() {
+  local version="$1"
+  local min_version="$2"
+  local max_version="$3"
+
+  if [[ -n "$min_version" ]] && version_lt "$version" "$min_version"; then
+    return 1
+  fi
+  if [[ -n "$max_version" ]] && ! version_lt "$version" "$max_version"; then
+    return 1
+  fi
+  return 0
+}
+
 while [[ "${1:-}" == --* ]]; do
   case "$1" in
     --build)
@@ -83,13 +123,38 @@ host_multiarch_include="x86_64-linux-gnu"
 bindgen_extra_clang_args="--target=$clang_target --sysroot=$sysroot -isystem$sysroot/usr/include -isystem$sysroot/usr/include/$multiarch_include"
 bindgen_target_env="BINDGEN_EXTRA_CLANG_ARGS_${rust_target//-/_}"
 fork_bindgen_extra_clang_args_env="RUSTY_V8_FORK_BINDGEN_EXTRA_CLANG_ARGS"
-fork_patches=(
-  "$repo_root/fork_patches/patches/0001-build-config-add-loong64-sysroot.patch"
-  "$repo_root/fork_patches/patches/0002-build-config-skip-loong64-clang-builtins.patch"
-  "$repo_root/fork_patches/patches/0003-build-config-add-debian-multiarch-includes.patch"
-  "$repo_root/fork_patches/patches/0004-build-rs-add-fork-bindgen-args-env.patch"
+upstream_version="$(read_upstream_version)"
+fork_patch_specs=(
+  "149.2.0||$repo_root/fork_patches/patches/0001-build-config-add-loong64-sysroot.patch"
+  "149.2.0||$repo_root/fork_patches/patches/0002-build-config-skip-loong64-clang-builtins.patch"
+  "149.2.0||$repo_root/fork_patches/patches/0003-build-config-add-debian-multiarch-includes.patch"
+  "149.2.0||$repo_root/fork_patches/patches/0004-build-rs-add-fork-bindgen-args-env.patch"
 )
+fork_patch_ranges=()
+fork_patches=()
 fork_gn_args="target_os=\"linux\" target_cpu=\"$gn_cpu\" v8_target_cpu=\"$gn_cpu\" use_sysroot=true target_sysroot=\"$gn_target_sysroot\" target_sysroot_dir=\"//.fork_build/sysroots\" system_libdir=\"$system_libdir\" pkg_config=\"$host_tools_dir/pkg-config\" host_pkg_config=\"$host_tools_dir/pkg-config\""
+
+select_fork_patches() {
+  local spec
+  local min_version
+  local max_version
+  local patch_file
+
+  for spec in "${fork_patch_specs[@]}"; do
+    IFS='|' read -r min_version max_version patch_file <<<"$spec"
+    fork_patch_ranges+=("${min_version}..${max_version}|${patch_file}")
+    if version_in_range "$upstream_version" "$min_version" "$max_version"; then
+      fork_patches+=("$patch_file")
+    fi
+  done
+
+  if [[ "${#fork_patches[@]}" == 0 ]]; then
+    echo "no fork patches selected for upstream version: $upstream_version" >&2
+    exit 1
+  fi
+}
+
+select_fork_patches
 
 ensure_fork_build_ignored() {
   local exclude_file="$repo_root/.git/info/exclude"
@@ -277,6 +342,7 @@ EOF
 if [[ "$dry_run" == 1 ]]; then
   printf 'build=%s\n' "$build"
   printf 'profile=%s\n' "$profile"
+  printf 'upstream_version=%s\n' "$upstream_version"
   printf 'arch=%s\n' "$arch"
   printf 'docker_platform=%s\n' "$docker_platform"
   printf 'debian_arch=%s\n' "$debian_arch"
@@ -297,6 +363,7 @@ if [[ "$dry_run" == 1 ]]; then
   printf 'cargo_target_dir=%s\n' "$cargo_target_dir"
   printf 'fork_bindgen_extra_clang_args_env=%s\n' "$fork_bindgen_extra_clang_args_env"
   printf 'bindgen_extra_clang_args=%s\n' "$bindgen_extra_clang_args"
+  printf 'fork_patch_ranges=%s\n' "${fork_patch_ranges[*]}"
   printf 'fork_patches=%s\n' "${fork_patches[*]}"
   printf 'extra_gn_args=%s\n' "$fork_gn_args"
   exit 0
